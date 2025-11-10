@@ -1,0 +1,11 @@
+name: validate
+on: [push, pull_request]
+jobs:
+  kubeconform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifests
+        uses: docker://ghcr.io/yannh/kubeconform:latest
+        with:
+          args: -strict -summary -output json config deploy storage rbac policy

@@ -1,0 +1,27 @@
+git clone https://github.com/sivakumaranrg/k8s-sme.git
+cd k8s-sme
+kubectl create ns lab 2>/dev/null || true
+kubectl config set-context --current --namespace=lab
+
+kubectl apply -f config/
+kubectl apply -f deploy/deploy-web.yaml
+kubectl apply -f deploy/svc-web.yaml
+kubectl rollout status deploy/web
+kubectl get all
+
+kubectl delete svc web
+kubectl apply -f deploy/svc-web-nodeport.yaml
+NODE_PORT=$(kubectl get svc web -o jsonpath='{.spec.ports[0].nodePort}')
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+curl -I http://$NODE_IP:$NODE_PORT | head -n 1
+
+kubectl apply -f storage/pv-web.yaml
+kubectl apply -f storage/pvc.yaml
+kubectl apply -f storage/pod-with-pvc.yaml
+kubectl wait --for=condition=Ready pod/pvc-tester --timeout=120s
+STAMP=$(date +%s)
+kubectl exec pvc-tester -- sh -c "echo $STAMP >/data/proof.txt && sync && cat /data/proof.txt"
+kubectl delete pod pvc-tester
+kubectl apply -f storage/pod-with-pvc.yaml
+kubectl wait --for=condition=Ready pod/pvc-tester --timeout=120s
+kubectl exec pvc-tester -- sh -c "echo EXPECT:$STAMP; echo FOUND:$(cat /data/proof.txt)"
